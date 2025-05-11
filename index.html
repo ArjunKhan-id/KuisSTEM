@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Kuis STEM dengan Registrasi</title>
+<!-- SweetAlert CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+<style>
+  /* [CSS sebelumnya tetap sama] */
+</style>
+</head>
+<body>
+  <!-- [HTML sebelumnya tetap sama] -->
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+
+<!-- SweetAlert JS -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<!-- EmailJS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+
+<script>
+(function(){
+  'use strict';
+  
+  // Initialize EmailJS dengan User ID Anda
+  emailjs.init('blfHFeOa_y4hjwoMX'); // User ID EmailJS Anda
+  
+  // Firebase Config
+  const firebaseConfig = {
+    apiKey: "AIzaSyAwtJYQPYCXGaHNhSxc0v_kv1GS8MNAGXI",
+    authDomain: "kuis-b4cb8.firebaseapp.com",
+    projectId: "kuis-b4cb8",
+    storageBucket: "kuis-b4cb8.firebasestorage.app",
+    messagingSenderId: "842499241086",
+    appId: "1:842499241086:web:53f914ca316ad77119142f",
+    measurementId: "G-8Q2MGB2KXW"
+  };
+  
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  
+  // Fungsi untuk mengirim email verifikasi custom melalui EmailJS
+  function sendCustomVerificationEmail(email, username) {
+    const templateParams = {
+      to_email: email,
+      to_name: username,
+      from_name: "Tim Kuis STEM",
+      message: `Hai ${username}, terima kasih telah mendaftar di Kuis STEM. Silakan verifikasi email Anda untuk mulai bermain.`,
+      verification_link: "https://kuis-b4cb8.firebaseapp.com/verify" // Ganti dengan link verifikasi Anda
+    };
+    
+    return emailjs.send('service_4uhgcel', 'template_1n9mh6s', templateParams)
+      .then(() => {
+        console.log('Email verifikasi custom terkirim!');
+        return true;
+      }, (error) => {
+        console.error('Gagal mengirim email verifikasi custom:', error);
+        return false;
+      });
+  }
+
+  // [Bagian registrasi]
+  registerBtn.addEventListener('click', () => {
+    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    
+    messageEl.textContent = '';
+    
+    if (!username || !email || !password) {
+      messageEl.textContent = 'Semua field harus diisi.';
+      return;
+    }
+    
+    if (password.length < 6) {
+      messageEl.textContent = 'Password minimal 6 karakter.';
+      return;
+    }
+    
+    registerBtn.disabled = true;
+    registerBtn.textContent = 'Mendaftarkan...';
+    
+    auth.createUserWithEmailAndPassword(email, password)
+      .then(({user}) => {
+        return user.updateProfile({
+          displayName: username
+        }).then(() => user);
+      })
+      .then(user => {
+        // Kirim email verifikasi Firebase
+        return user.sendEmailVerification()
+          .then(() => {
+            // Kirim email custom melalui EmailJS
+            return sendCustomVerificationEmail(email, username);
+          })
+          .then((emailjsSuccess) => {
+            let successMessage = `Kami telah mengirim email verifikasi ke <strong>${email}</strong>.`;
+            
+            if (!emailjsSuccess) {
+              successMessage += "<br><br>Email custom tidak terkirim, tetapi email verifikasi Firebase sudah dikirim.";
+            }
+            
+            Swal.fire({
+              title: 'Pendaftaran Berhasil!',
+              html: successMessage,
+              icon: 'success',
+              confirmButtonText: 'OK'
+            });
+            
+            showSlide(verifySlide, registerSlide);
+            
+            // Periksa verifikasi email setiap 5 detik
+            const checkVerificationInterval = setInterval(() => {
+              user.reload().then(() => {
+                if (user.emailVerified) {
+                  clearInterval(checkVerificationInterval);
+                  proceedToQuizBtn.style.display = 'block';
+                  Swal.fire({
+                    title: 'Email Terverifikasi!',
+                    text: 'Email Anda telah diverifikasi. Silakan mulai kuis.',
+                    icon: 'success',
+                    confirmButtonText: 'Mulai Kuis'
+                  });
+                }
+              });
+            }, 5000);
+          });
+      })
+      .catch(error => {
+        registerBtn.disabled = false;
+        registerBtn.textContent = 'Daftar';
+        
+        let errorMessage = error.message;
+        
+        if (error.code === 'auth/email-already-in-use') {
+          errorMessage = 'Email sudah terdaftar. Gunakan email lain.';
+        } else if (error.code === 'auth/invalid-email') {
+          errorMessage = 'Format email tidak valid.';
+        } else if (error.code === 'auth/weak-password') {
+          errorMessage = 'Password terlalu lemah. Gunakan minimal 6 karakter.';
+        }
+        
+        Swal.fire({
+          title: 'Pendaftaran Gagal',
+          text: errorMessage,
+          icon: 'error',
+          confirmButtonText: 'OK'
+        });
+      });
+  });
+
+  // [Bagian kuis dan lainnya tetap sama]
+  
+})();
+</script>
+</body>
+  </html>
